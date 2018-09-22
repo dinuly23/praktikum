@@ -2,8 +2,8 @@
 
 using namespace std;
 
-template<size_t N>
-constexpr int Size(int (&a)[N]){
+template<size_t N, typename T>
+constexpr size_t Size(const T (&a)[N]){
 	return N;
 }
 

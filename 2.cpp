@@ -4,23 +4,25 @@ using namespace std;
 
 class  ComplexNumber{
 public:
-	int Im;
-	int Re;
-	constexpr ComplexNumber(int re=0,int im=0):Im(im),Re(re){
+	double Im;
+	double Re;
+	constexpr ComplexNumber(double re=0,double im=0):Im(im),Re(re){
 	}
-	constexpr void SetRe(int re){
+	constexpr ComplexNumber(const ComplexNumber& copy):Im(copy.Im),Re(copy.Re){
+	}
+	constexpr void SetRe(double re){
 		Re=re;
 	}
-	constexpr void SetIm(int im){
+	constexpr void SetIm(double im){
 		Im=im;
 	}
-	constexpr int GetRe() const{
+	constexpr double GetRe() const{
 		return Re;
 	}
-	constexpr int GetIm() const{
+	constexpr double GetIm() const{
 		return Im;
 	}
-	constexpr bool operator== (const ComplexNumber a) const{
+	constexpr bool operator== (const ComplexNumber& a) const{
 		return (a.Re==Re && a.Im==Im);
 	}
 };
