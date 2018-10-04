@@ -7,9 +7,14 @@ const char* f2(const std::string& str) {
 	return str.c_str();
 }
 
+template <typename F>
+const auto Compose(const F &f) {
+    return [&f](auto x)->auto{ return f(x); };
+}
 
-auto Compose(std::function<double(const char*)> f1 , std::function<const char*(const std::string& str)> f2){
-	return [&f1, &f2](const std::string& s)->double{ return f1(f2(s)); };
+template <typename F0, typename... F>
+const auto Compose(const F0 &f0,const F... f) {
+    return [&f0,f...](auto x)->auto{ return f0(Compose(f...)(x)); };
 }
 
 int 
