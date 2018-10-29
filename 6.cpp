@@ -3,15 +3,13 @@
 #include <map>
 #include <utility>
 #include <functional>
-#include <list>
-#include <iterator>
-#include <algorithm>
+#include <cassert>
 
 template <class T>
 class TBasePtr{
-		
-	public:
+	protected:
 		T *  ptr;
+	public:
 		TBasePtr(T*  p  =  0): ptr(p){}
 		~TBasePtr(){ delete  ptr;}
 		T&  operator  *  ()  const;
@@ -66,78 +64,80 @@ template <class T>
 class TIntrusivePtr: public TBasePtr<T> {
 	public:
 		TIntrusivePtr(T*  p  =  0) : TBasePtr<T>(p) {
-			this->ptr->incRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 		}
 		TIntrusivePtr(TIntrusivePtr  const  & other) : TBasePtr<T>(other.ptr){
-			this->ptr->incRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 		}
 		TIntrusivePtr(TIntrusivePtr&& other) : TBasePtr<T>(other.ptr)
 		{
-			other.ptr->decRef(&other);
-			this->ptr->incRef(this);			
+			if (other.ptr!=nullptr)
+				other.ptr ->decRef();
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 		}
 		TIntrusivePtr& operator  =  (TIntrusivePtr  const  & other){
-			this->ptr->decRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->decRef();
 			this->ptr=other.ptr;
-			this->ptr->incRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 			return *this;
 		}
 		TIntrusivePtr& operator=(TIntrusivePtr&& other)
 		{
-			this->ptr->decRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->decRef();
 			this->ptr = other.ptr;
-			other.ptr->decRef(&other);
-			this->ptr->incRef(this);
+			if (other.ptr!=nullptr)
+				other.ptr ->decRef();
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 			return *this;
 		}
 		T* Get() {
 			return this->ptr;
 		}
-		void Reset(T* other = nullptr){
+		void Reset(T* other=nullptr){
 			if (this->ptr!=nullptr)
-				this->ptr->decRef(this);
+				this->ptr->decRef();
 			this->ptr=other;
-			if (other!=nullptr)
-				this->ptr->incRef(this);
+			if (this->ptr!=nullptr)
+				this->ptr->incRef();
 		}
-
+		T* Release() noexcept {
+			if(this->ptr){
+				this->ptr->decRef();
+				T* copy_ptr= this->ptr;
+				this->ptr=nullptr;
+				return copy_ptr;
+			}
+			return nullptr;		
+		}
 };
 
-template <class T>
 class TRefCounter {
 	protected:
-		std::list<TIntrusivePtr<T> *> listRef;
+		unsigned int refCounter;
 	public:
-		TRefCounter() {}
-		~TRefCounter(){ 
-			this->Release();
-		} 
-		size_t UseCount() {
-			return listRef.size();
+		TRefCounter() : refCounter(0) {}
+		unsigned int UseCount() {
+			return refCounter;
 		}
-		void incRef(TIntrusivePtr<T> * p) {
-			listRef.push_front(p);
+		void incRef() {
+			refCounter++;
 		}
-		bool decRef(TIntrusivePtr<T> * p) {
-			auto it=std::find(listRef.begin(),listRef.end(),p);
-			if (it!=listRef.end()) {
-				(*it)->ptr=nullptr;
-				listRef.erase(it);
-				return true;
+		bool decRef() {
+			if (refCounter>0){
+				return (--refCounter)>0;
 			}
 			return false;
 		}
-		void Release(){
-			if(!listRef.empty()) {
-				while (!listRef.empty()) {
-					listRef.front()->Reset();
-				}
-			}
-			listRef.clear();
-		}
 };
 
-class TDoc: public TRefCounter<TDoc> {
+class TDoc: public TRefCounter {
 	using TPtr = TIntrusivePtr<TDoc>;
 	public:
 		int n;
@@ -148,15 +148,23 @@ int
 main(void){
 	
 
-	TDoc* p = new TDoc(10);
+	TDoc* p = new TDoc(15);
 	TDoc* p1 = new TDoc(20);
+	TDoc* p2 = new TDoc(25);
 	TIntrusivePtr<TDoc> ip1(p);
-	std::cout << ip1->n << std::endl;
-	TIntrusivePtr<TDoc> ip2(p1);
-	std::cout << ip2->n << std::endl;
-	std::cout << p->UseCount() << std::endl;
-	ip2=ip1;
-	TIntrusivePtr<TDoc> ip3(p);
-	std::cout << p->UseCount() << std::endl;
+	TIntrusivePtr<TDoc> ip2(p);
+	TIntrusivePtr<TDoc> ip3(p1);
+	TIntrusivePtr<TDoc> ip4(p2);
+	assert(p->UseCount()==2);
+	assert(ip1.Release()->n == 15);
+	assert(ip1 == nullptr);
+	assert(p->UseCount()==1);
+	assert(ip2->n == 15);
+	ip2=std::move(ip3);
+	assert(p->UseCount()==0);
+	assert(p1->UseCount()==1);
+	ip2=ip4;
+	assert(p1->UseCount()==0);
+	assert(p2->UseCount()==2);
 	return 0;
 }
